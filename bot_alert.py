@@ -25,7 +25,19 @@ class AdvancedCryptoAnalyzer:
             url = f"{self.base_url}/klines"
             params = {'symbol': symbol, 'interval': interval, 'limit': limit}
             response = requests.get(url, params=params)
+            
+            # Verificar el código de estado HTTP
+            if response.status_code != 200:
+                print(f"Error HTTP {response.status_code} obteniendo datos de {symbol}")
+                print(f"Respuesta: {response.text}")
+                return None
+                
             data = response.json()
+            
+            # Verificar si hay datos
+            if not data or len(data) == 0:
+                print(f"No hay datos disponibles para {symbol}")
+                return None
             
             df = pd.DataFrame(data, columns=[
                 'timestamp', 'open', 'high', 'low', 'close', 'volume',
@@ -37,9 +49,22 @@ class AdvancedCryptoAnalyzer:
             for col in ['open', 'high', 'low', 'close', 'volume']:
                 df[col] = df[col].astype(float)
             
+            # Verificar si el DataFrame tiene datos
+            if df.empty:
+                print(f"DataFrame vacío para {symbol}")
+                return None
+                
+            print(f"✅ Datos obtenidos correctamente para {symbol}: {len(df)} registros")
             return df
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Error de conexión para {symbol}: {e}")
+            return None
+        except ValueError as e:
+            print(f"Error procesando datos de {symbol}: {e}")
+            return None
         except Exception as e:
-            print(f"Error obteniendo datos de {symbol}: {e}")
+            print(f"Error inesperado obteniendo datos de {symbol}: {e}")
             return None
     
     def calculate_rsi(self, data, period=14):
@@ -302,7 +327,10 @@ class AdvancedCryptoAnalyzer:
         print(f"{'='*70}")
         
         df = self.get_klines(symbol, interval='1h', limit=500)
-        if df is None:
+        if df is None or df.empty:
+            print(f"❌ No se pudo analizar {symbol} - No hay datos disponibles")
+            if self.telegram_token and self.chat_id:
+                self.telegram_messages.append(f"\n❌ Error: No se pudo obtener datos para {symbol}")
             return None
         
         # Calcular indicadores
